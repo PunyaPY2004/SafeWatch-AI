@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeWatch AI — {% block title %}Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<!-- ── Sidebar Navigation ── -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🛡️</div>
+    <div>
+      <div class="brand-name">SafeWatch AI</div>
+      <div class="brand-sub">Surveillance System</div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">MAIN</div>
+  <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+    <span class="nav-icon">🏠</span> Home
+  </a>
+  <a href="/dashboard" class="nav-item {% if request.path == '/dashboard' %}active{% endif %}">
+    <span class="nav-icon">📊</span> Dashboard
+  </a>
+  <a href="/live" class="nav-item {% if request.path == '/live' %}active{% endif %}">
+    <span class="nav-icon">📹</span> Live Feeds
+  </a>
+  <a href="/incidents" class="nav-item {% if request.path == '/incidents' %}active{% endif %}">
+    <span class="nav-icon">⚠️</span> Incidents
+    <span class="badge" id="nav-badge">0</span>
+  </a>
+
+  <div class="nav-section-label">SYSTEM</div>
+  <a href="/settings" class="nav-item {% if request.path == '/settings' %}active{% endif %}">
+    <span class="nav-icon">⚙️</span> Settings
+  </a>
+
+  <div class="sidebar-bottom">
+    <div class="monitoring-toggle">
+      <span>Monitoring</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="global-monitoring-toggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="status-dot-row">
+      <span class="status-dot" id="conn-dot"></span>
+      <span id="conn-label" style="font-size:12px;color:#aaa;">Connecting...</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Alert Toast ── -->
+<div id="alert-toast" class="alert-toast hidden">
+  <div class="toast-icon">🚨</div>
+  <div class="toast-body">
+    <div class="toast-title">THREAT DETECTED</div>
+    <div class="toast-msg" id="toast-msg">—</div>
+  </div>
+  <button onclick="document.getElementById('alert-toast').classList.add('hidden')">✕</button>
+</div>
+
+<!-- ── Main Content ── -->
+<main class="main-content">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-clock" id="live-clock"></div>
+      <div class="topbar-status">
+        <span class="status-dot active" id="system-status-dot"></span>
+        <span id="system-status-label">System Online</span>
+      </div>
+    </div>
+  </div>
+
+  {% block content %}{% endblock %}
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

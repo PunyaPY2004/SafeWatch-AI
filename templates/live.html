@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Live Feeds{% endblock %}
+{% block page_title %}📹 Live Camera Feeds{% endblock %}
+
+{% block content %}
+<!-- Add Camera Bar -->
+<div class="card mb-16">
+  <div class="card-body inline-form">
+    <input type="text" id="new-cam-id"  placeholder="Camera ID" class="input-field sm">
+    <input type="text" id="new-source"  placeholder="Source (0 or RTSP URL)" class="input-field">
+    <input type="text" id="new-location" placeholder="Location" class="input-field">
+    <select id="new-type" class="input-field sm">
+      <option value="public">Public Space</option>
+      <option value="elevator">Elevator / Lift</option>
+    </select>
+    <button onclick="addCam()" class="btn btn-primary">+ Add Camera</button>
+  </div>
+</div>
+
+<!-- Camera Grid -->
+<div class="camera-grid" id="camera-grid">
+  {% for cam in cameras %}
+  <div class="camera-tile" id="tile-{{ cam.id }}">
+    <div class="camera-header">
+      <span class="cam-badge">{{ cam.id }}</span>
+      <span class="cam-location-label">{{ cam.location }}</span>
+      <button onclick="removeCam('{{ cam.id }}')" class="cam-remove">✕</button>
+    </div>
+    <div class="cam-feed-wrap">
+      <img src="/video_feed/{{ cam.id }}" class="cam-feed" alt="Camera Feed">
+    </div>
+    <div class="cam-footer" id="footer-{{ cam.id }}">
+      <span class="threat-label" id="threat-{{ cam.id }}">● NORMAL</span>
+      <span class="cam-time" id="time-{{ cam.id }}">—</span>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if not cameras %}
+  <div class="no-cameras-msg">
+    <div style="font-size:60px">📷</div>
+    <h2>No Cameras Added</h2>
+    <p>Add a camera above to start monitoring.</p>
+    <p>Use <code>0</code> for your laptop webcam.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Live Alert Panel -->
+<div class="card mt-20">
+  <div class="card-header">
+    <h2>🚨 Live Alert Feed</h2>
+    <button onclick="document.getElementById('alert-log').innerHTML=''" class="btn btn-sm">Clear</button>
+  </div>
+  <div class="card-body">
+    <div id="alert-log" class="alert-log">
+      <p class="text-muted">Waiting for alerts…</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update threat labels from socket alerts
+socket.on('alert', function(data) {
+  const label = document.getElementById('threat-' + data.cam_id);
+  const footer = document.getElementById('footer-' + data.cam_id);
+  if (label) {
+    label.textContent = '● ' + data.level + ' — ' + data.threat_type.substring(0,30);
+    label.style.color = data.level === 'THREAT' ? '#ff4444' :
+                        data.level === 'SUSPICIOUS' ? '#ffaa00' : '#44ff88';
+    if (footer) footer.style.background = data.level === 'THREAT' ? 'rgba(255,0,0,0.2)' : '';
+  }
+  if (document.getElementById('time-' + data.cam_id))
+    document.getElementById('time-' + data.cam_id).textContent = data.timestamp.slice(11,19);
+
+  // Add to live log
+  const log = document.getElementById('alert-log');
+  const first = log.querySelector('.text-muted');
+  if (first) first.remove();
+
+  const row = document.createElement('div');
+  row.className = 'alert-log-row ' + (data.level === 'THREAT' ? 'threat' : 'suspicious');
+  row.innerHTML = `
+    <span class="log-time">${data.timestamp.slice(11,19)}</span>
+    <span class="log-cam">${data.cam_id}</span>
+    <span class="log-loc">${data.location}</span>
+    <span class="log-type">${data.threat_type}</span>
+    <span class="log-score">${data.score.toFixed(0)}%</span>
+    ${data.snapshot ? `<img src="${data.snapshot}" class="log-snap">` : ''}
+  `;
+  log.insertBefore(row, log.firstChild);
+  // Keep max 50 rows
+  while (log.children.length > 50) log.removeChild(log.lastChild);
+});
+
+function addCam() {
+  const id  = document.getElementById('new-cam-id').value || `CAM_0${Date.now()%99}`;
+  const src = document.getElementById('new-source').value || '0';
+  const loc = document.getElementById('new-location').value || 'Unknown';
+  fetch('/api/add_camera', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ cam_id:id, source:src, location:loc })
+  }).then(r=>r.json()).then(d => {
+    if (d.status === 'ok') {
+      // Inject new tile
+      const grid = document.getElementById('camera-grid');
+      const noMsg = grid.querySelector('.no-cameras-msg');
+      if (noMsg) noMsg.remove();
+      const tile = document.createElement('div');
+      tile.className = 'camera-tile';
+      tile.id = 'tile-' + d.cam_id;
+      tile.innerHTML = `
+        <div class="camera-header">
+          <span class="cam-badge">${d.cam_id}</span>
+          <span class="cam-location-label">${loc}</span>
+          <button onclick="removeCam('${d.cam_id}')" class="cam-remove">✕</button>
+        </div>
+        <div class="cam-feed-wrap">
+          <img src="/video_feed/${d.cam_id}" class="cam-feed">
+        </div>
+        <div class="cam-footer" id="footer-${d.cam_id}">
+          <span class="threat-label" id="threat-${d.cam_id}">● NORMAL</span>
+          <span class="cam-time" id="time-${d.cam_id}">—</span>
+        </div>`;
+      grid.appendChild(tile);
+    } else { alert('❌ ' + d.message); }
+  });
+}
+
+function removeCam(id) {
+  if (!confirm(`Remove camera ${id}?`)) return;
+  fetch('/api/remove_camera/' + id, { method:'DELETE' })
+    .then(() => { document.getElementById('tile-' + id)?.remove(); });
+}
+</script>
+{% endblock %}

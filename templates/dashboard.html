@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}📊 Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stat Cards -->
+<div class="stats-row">
+  <div class="stat-block">
+    <div class="stat-block-icon" style="background:#1a3a6b">📋</div>
+    <div>
+      <div class="stat-block-val">{{ stats.total }}</div>
+      <div class="stat-block-label">Total Incidents</div>
+    </div>
+  </div>
+  <div class="stat-block danger">
+    <div class="stat-block-icon" style="background:#6b1a1a">🚨</div>
+    <div>
+      <div class="stat-block-val">{{ stats.active }}</div>
+      <div class="stat-block-label">Active Alerts</div>
+    </div>
+  </div>
+  <div class="stat-block success">
+    <div class="stat-block-icon" style="background:#1a5f2e">✅</div>
+    <div>
+      <div class="stat-block-val">{{ stats.resolved }}</div>
+      <div class="stat-block-label">Resolved</div>
+    </div>
+  </div>
+  <div class="stat-block warning">
+    <div class="stat-block-icon" style="background:#5f4a1a">⚡</div>
+    <div>
+      <div class="stat-block-val">{{ stats.high_threat }}</div>
+      <div class="stat-block-label">High Threat</div>
+    </div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-block-icon" style="background:#1a4a5f">📷</div>
+    <div>
+      <div class="stat-block-val" id="dash-cam-count">{{ cameras|length }}</div>
+      <div class="stat-block-label">Cameras</div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <!-- Chart: daily trend -->
+  <div class="card span-2">
+    <div class="card-header">
+      <h2>📈 Incident Trend (Last 7 Days)</h2>
+    </div>
+    <div class="card-body">
+      <canvas id="trendChart" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- Chart: by type -->
+  <div class="card">
+    <div class="card-header"><h2>🔍 By Threat Type</h2></div>
+    <div class="card-body">
+      <canvas id="typeChart" height="160"></canvas>
+    </div>
+  </div>
+
+  <!-- Recent Incidents -->
+  <div class="card span-2">
+    <div class="card-header">
+      <h2>🕐 Recent Incidents</h2>
+      <a href="/incidents" class="btn btn-sm">View All</a>
+    </div>
+    <div class="card-body p0">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th><th>Camera</th><th>Location</th>
+            <th>Threat</th><th>Score</th><th>Time</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inc in incidents %}
+          <tr>
+            <td class="mono">{{ inc.id }}</td>
+            <td class="mono">{{ inc.camera_id }}</td>
+            <td>{{ inc.location }}</td>
+            <td>
+              <span class="badge-threat {% if inc.confidence >= 65 %}high{% elif inc.confidence >= 35 %}mid{% else %}low{% endif %}">
+                {{ inc.threat_type[:30] }}{% if inc.threat_type|length > 30 %}…{% endif %}
+              </span>
+            </td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar" style="width:{{ inc.confidence }}%;background:{% if inc.confidence>=65 %}#e53935{% elif inc.confidence>=35 %}#f57c00{% else %}#43a047{% endif %}"></div>
+                <span>{{ inc.confidence }}%</span>
+              </div>
+            </td>
+            <td class="mono text-sm">{{ inc.created_at[:16] }}</td>
+            <td>
+              <span class="status-pill {{ 'active' if inc.status == 'ACTIVE' else 'resolved' }}">
+                {{ inc.status }}
+              </span>
+            </td>
+            <td>
+              {% if inc.status == 'ACTIVE' %}
+              <button onclick="resolve({{ inc.id }}, this)" class="btn btn-sm btn-success">Resolve</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not incidents %}
+          <tr><td colspan="8" class="text-center text-muted">No incidents yet</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Hot Locations -->
+  <div class="card">
+    <div class="card-header"><h2>📍 Hot Locations</h2></div>
+    <div class="card-body">
+      {% for loc in stats.by_location %}
+      <div class="location-row">
+        <span class="location-name">{{ loc.location }}</span>
+        <div class="location-bar-wrap">
+          <div class="location-bar" style="width:{{ [loc.count * 20, 100]|min }}%"></div>
+        </div>
+        <span class="location-count">{{ loc.count }}</span>
+      </div>
+      {% endfor %}
+      {% if not stats.by_location %}
+      <p class="text-muted text-center">No data yet</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Camera Status -->
+  <div class="card">
+    <div class="card-header">
+      <h2>📷 Camera Status</h2>
+      <a href="/live" class="btn btn-sm">Live View</a>
+    </div>
+    <div class="card-body">
+      {% for cam in cameras %}
+      <div class="cam-status-row">
+        <span class="status-dot {% if cam.active %}active{% endif %}"></span>
+        <div>
+          <div class="cam-id">{{ cam.id }}</div>
+          <div class="cam-loc">{{ cam.location }}</div>
+        </div>
+        <span class="cam-type-badge {{ cam.type }}">{{ cam.type }}</span>
+      </div>
+      {% endfor %}
+      {% if not cameras %}
+      <p class="text-muted text-center">No cameras added yet</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Trend Chart
+const daily = {{ stats.daily | tojson }};
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: daily.map(d => d.day || 'Today'),
+    datasets: [{
+      label: 'Incidents',
+      data: daily.map(d => d.count),
+      borderColor: '#4a9eff',
+      backgroundColor: 'rgba(74,158,255,0.1)',
+      fill: true, tension: 0.4,
+      pointBackgroundColor: '#4a9eff', pointRadius: 5
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#ccc' } } },
+    scales: {
+      x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+      y: { ticks: { color: '#aaa' }, grid: { color: '#333' }, beginAtZero: true }
+    }
+  }
+});
+
+// Type Chart
+const types = {{ stats.by_type | tojson }};
+new Chart(document.getElementById('typeChart'), {
+  type: 'doughnut',
+  data: {
+    labels: types.map(t => t.type.substring(0,20)),
+    datasets: [{
+      data: types.map(t => t.count),
+      backgroundColor: ['#e53935','#f57c00','#fbc02d','#43a047','#1e88e5'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#ccc', boxWidth: 12 }, position: 'bottom' } }
+  }
+});
+
+function resolve(id, btn) {
+  fetch(`/api/resolve/${id}`, { method: 'POST' })
+    .then(() => { btn.closest('tr').querySelector('.status-pill').textContent = 'RESOLVED';
+                  btn.closest('tr').querySelector('.status-pill').className = 'status-pill resolved';
+                  btn.remove(); });
+}
+
+// Live stats via socket
+socket.on('alert', d => {
+  document.getElementById('dash-cam-count');
+  location.reload();
+});
+</script>
+{% endblock %}

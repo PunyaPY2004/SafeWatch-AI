@@ -1,0 +1,13 @@
+# Don't upload these to GitHub
+*.pt
+*.h5
+*.db
+__pycache__/
+*.pyc
+logs/
+snapshots/
+datasets/
+raw_videos/
+safewatch_log.txt
+elevator_warnings.log
+uploads/

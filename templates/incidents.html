@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Incidents{% endblock %}
+{% block page_title %}⚠️ Incident Log{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card mb-16">
+  <div class="card-body inline-form">
+    <input type="text" id="search-box" placeholder="🔍 Search location, threat type…" class="input-field" oninput="filterTable()">
+    <select id="status-filter" class="input-field sm" onchange="filterTable()">
+      <option value="">All Status</option>
+      <option value="ACTIVE">Active</option>
+      <option value="RESOLVED">Resolved</option>
+    </select>
+    <select id="level-filter" class="input-field sm" onchange="filterTable()">
+      <option value="">All Threat Levels</option>
+      <option value="high">High (≥65%)</option>
+      <option value="mid">Medium (35–64%)</option>
+      <option value="low">Low (&lt;35%)</option>
+    </select>
+    <button onclick="exportCSV()" class="btn btn-secondary">⬇ Export CSV</button>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <div class="card-header">
+    <h2>All Incidents <span class="text-muted text-sm">({{ incidents|length }} total)</span></h2>
+    <button onclick="resolveAll()" class="btn btn-sm btn-success">Resolve All Active</button>
+  </div>
+  <div class="card-body p0">
+    <table class="table" id="incidents-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">ID ↕</th>
+          <th onclick="sortTable(1)">Camera</th>
+          <th onclick="sortTable(2)">Location</th>
+          <th>Threat Type</th>
+          <th onclick="sortTable(4)">Score ↕</th>
+          <th onclick="sortTable(5)">Time ↕</th>
+          <th>Status</th>
+          <th>Snapshot</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="incident-tbody">
+        {% for inc in incidents %}
+        <tr data-id="{{ inc.id }}"
+            data-status="{{ inc.status }}"
+            data-score="{{ inc.confidence }}">
+          <td class="mono">#{{ inc.id }}</td>
+          <td class="mono">{{ inc.camera_id }}</td>
+          <td>{{ inc.location }}</td>
+          <td>
+            <span class="badge-threat {% if inc.confidence >= 65 %}high{% elif inc.confidence >= 35 %}mid{% else %}low{% endif %}">
+              {{ inc.threat_type }}
+            </span>
+          </td>
+          <td>
+            <div class="score-bar-wrap">
+              <div class="score-bar" style="width:{{ inc.confidence }}%;
+                   background:{% if inc.confidence>=65 %}#e53935{% elif inc.confidence>=35 %}#f57c00{% else %}#43a047{% endif %}">
+              </div>
+              <span>{{ inc.confidence }}%</span>
+            </div>
+          </td>
+          <td class="mono text-sm">{{ inc.created_at[:16] }}</td>
+          <td>
+            <span class="status-pill {{ 'active' if inc.status == 'ACTIVE' else 'resolved' }}" id="sp-{{ inc.id }}">
+              {{ inc.status }}
+            </span>
+          </td>
+          <td>
+            {% if inc.snapshot_path %}
+            <button onclick="showSnap('{{ inc.snapshot_path }}')" class="btn btn-sm">👁 View</button>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if inc.status == 'ACTIVE' %}
+            <button onclick="resolveOne({{ inc.id }}, this)" class="btn btn-sm btn-success" id="rb-{{ inc.id }}">
+              ✅ Resolve
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not incidents %}
+        <tr><td colspan="9" class="text-center text-muted">No incidents recorded yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Snapshot Modal -->
+<div id="snap-modal" class="modal hidden" onclick="this.classList.add('hidden')">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <button onclick="document.getElementById('snap-modal').classList.add('hidden')" class="modal-close">✕</button>
+    <img id="snap-img" src="" style="max-width:100%;border-radius:8px;">
+    <p id="snap-path" class="text-muted text-sm mt-8"></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function resolveOne(id, btn) {
+  fetch(`/api/resolve/${id}`, { method:'POST' }).then(() => {
+    document.getElementById('sp-'+id).textContent = 'RESOLVED';
+    document.getElementById('sp-'+id).className = 'status-pill resolved';
+    btn.remove();
+  });
+}
+function resolveAll() {
+  if (!confirm('Resolve all active incidents?')) return;
+  document.querySelectorAll('tr[data-status="ACTIVE"]').forEach(row => {
+    const id = row.dataset.id;
+    fetch(`/api/resolve/${id}`, { method:'POST' });
+    const sp = document.getElementById('sp-'+id);
+    if (sp) { sp.textContent='RESOLVED'; sp.className='status-pill resolved'; }
+    const rb = document.getElementById('rb-'+id);
+    if (rb) rb.remove();
+    row.dataset.status = 'RESOLVED';
+  });
+}
+function filterTable() {
+  const q      = document.getElementById('search-box').value.toLowerCase();
+  const status = document.getElementById('status-filter').value;
+  const level  = document.getElementById('level-filter').value;
+  document.querySelectorAll('#incident-tbody tr[data-id]').forEach(row => {
+    const text  = row.textContent.toLowerCase();
+    const s     = row.dataset.status;
+    const score = parseFloat(row.dataset.score);
+    let show = true;
+    if (q && !text.includes(q)) show = false;
+    if (status && s !== status) show = false;
+    if (level === 'high' && score < 65) show = false;
+    if (level === 'mid'  && (score < 35 || score >= 65)) show = false;
+    if (level === 'low'  && score >= 35) show = false;
+    row.style.display = show ? '' : 'none';
+  });
+}
+function showSnap(path) {
+  document.getElementById('snap-img').src = '/' + path;
+  document.getElementById('snap-path').textContent = path;
+  document.getElementById('snap-modal').classList.remove('hidden');
+}
+function exportCSV() {
+  const rows = [['ID','Camera','Location','Threat','Score','Time','Status']];
+  document.querySelectorAll('#incident-tbody tr[data-id]').forEach(r => {
+    const cells = r.querySelectorAll('td');
+    rows.push([cells[0].textContent.trim(), cells[1].textContent.trim(),
+               cells[2].textContent.trim(), cells[3].textContent.trim(),
+               cells[4].textContent.trim(), cells[5].textContent.trim(),
+               cells[6].textContent.trim()]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'safewatch_incidents.csv';
+  a.click();
+}
+let sortDir = {};
+function sortTable(col) {
+  sortDir[col] = !sortDir[col];
+  const tbody = document.getElementById('incident-tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr[data-id]'));
+  rows.sort((a,b) => {
+    const av = a.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const bv = b.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) return sortDir[col] ? an-bn : bn-an;
+    return sortDir[col] ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

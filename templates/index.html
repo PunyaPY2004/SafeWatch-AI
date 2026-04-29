@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block page_title %}SafeWatch AI — Control Center{% endblock %}
+
+{% block content %}
+<div class="home-hero">
+  <div class="hero-content">
+    <div class="hero-badge">🛡️ AI-Powered Surveillance</div>
+    <h1 class="hero-title">Women Safety &amp;<br>Public Decency<br><span class="gradient-text">Enforcement System</span></h1>
+    <p class="hero-desc">
+      Real-time AI surveillance that detects threats, harassment, and misconduct
+      in public spaces — and instantly alerts the control room before harm occurs.
+    </p>
+    <div class="hero-actions">
+      <a href="/dashboard" class="btn btn-primary">📊 Open Dashboard</a>
+      <a href="/live" class="btn btn-secondary">📹 Live Feeds</a>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-card">
+      <div class="stat-icon">📷</div>
+      <div class="stat-val" id="h-cams">0</div>
+      <div class="stat-label">Active Cameras</div>
+    </div>
+    <div class="stat-card alert-card">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-val" id="h-active">0</div>
+      <div class="stat-label">Active Alerts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-val" id="h-resolved">0</div>
+      <div class="stat-label">Resolved Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🤖</div>
+      <div class="stat-val">AI</div>
+      <div class="stat-label">Real-time Analysis</div>
+    </div>
+  </div>
+</div>
+
+<!-- Feature cards -->
+<div class="features-grid">
+  <div class="feature-card">
+    <div class="feature-icon" style="background:#1e3a5f">📹</div>
+    <h3>Live CCTV Analysis</h3>
+    <p>Processes live video feeds frame-by-frame using OpenCV at up to 20 FPS per camera.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon" style="background:#3a1e5f">🧠</div>
+    <h3>YOLO v8 + CNN Detection</h3>
+    <p>Detects persons, analyzes body language, and classifies threatening behavior in real time.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon" style="background:#5f1e1e">🔔</div>
+    <h3>Instant Alert System</h3>
+    <p>Sends SMS, email, and live dashboard alerts to the control room upon threat detection.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon" style="background:#1e5f3a">🔊</div>
+    <h3>Elevator Deterrent</h3>
+    <p>Issues real-time in-elevator audio and display warnings when misconduct is detected.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon" style="background:#5f4a1e">📸</div>
+    <h3>Evidence Capture</h3>
+    <p>Automatically saves snapshots of each incident with timestamp and location metadata.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon" style="background:#1e4a5f">🗄️</div>
+    <h3>Incident Log</h3>
+    <p>Full searchable database of all incidents — filter by location, type, time, and status.</p>
+  </div>
+</div>
+
+<!-- Quick Add Camera -->
+<div class="card mt-20">
+  <div class="card-header">
+    <h2>📷 Quick Add Camera</h2>
+  </div>
+  <div class="card-body">
+    <div class="add-cam-form">
+      <input type="text" id="cam-id"       placeholder="Camera ID (e.g. CAM_02)" class="input-field">
+      <input type="text" id="cam-source"   placeholder="Source (0 = webcam, or IP URL)" class="input-field">
+      <input type="text" id="cam-location" placeholder="Location (e.g. Park - Main Gate)" class="input-field">
+      <button onclick="addCamera()" class="btn btn-primary">+ Add Camera</button>
+    </div>
+    <p class="hint">💡 Use <code>0</code> for your laptop webcam. For IP cameras use <code>rtsp://user:pass@192.168.1.x:554/stream</code></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+fetch('/api/stats').then(r=>r.json()).then(d=>{
+  document.getElementById('h-active').textContent   = d.active;
+  document.getElementById('h-resolved').textContent = d.resolved;
+});
+fetch('/api/incidents').then(r=>r.json()).then(d=>{
+  // count unique camera IDs
+  const cams = new Set(d.map(i=>i.camera_id));
+  document.getElementById('h-cams').textContent = cams.size;
+});
+function addCamera(){
+  const id  = document.getElementById('cam-id').value || `CAM_0${Date.now()%10}`;
+  const src = document.getElementById('cam-source').value || '0';
+  const loc = document.getElementById('cam-location').value || 'Unknown';
+  fetch('/api/add_camera',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cam_id:id, source:src, location:loc})
+  }).then(r=>r.json()).then(d=>{
+    if(d.status==='ok') { alert(`✅ Camera ${d.cam_id} added!`); location.href='/live'; }
+    else alert('❌ Could not open camera: '+d.message);
+  });
+}
+</script>
+{% endblock %}

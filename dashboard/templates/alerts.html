@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>All Alerts — SafeWatch AI</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1D3461; --blue:#1D63B5; --mid:#2E75B6; --sky:#BDD7EE;
+      --pale:#EBF3FB; --dark:#1A2A3A; --gray:#6B7C93;
+      --red:#C0392B; --orange:#E67E22; --green:#27AE60;
+    }
+    body { font-family:'Segoe UI',Arial,sans-serif; background:var(--pale); color:var(--dark); }
+    .navbar {
+      background:var(--navy); padding:0 24px; display:flex;
+      align-items:center; justify-content:space-between;
+      height:60px; position:sticky; top:0; z-index:100;
+    }
+    .navbar-brand { color:white; font-size:20px; font-weight:700; text-decoration:none; }
+    .nav-links { display:flex; gap:4px; }
+    .nav-links a {
+      color:var(--sky); text-decoration:none; padding:8px 16px;
+      border-radius:6px; font-size:14px;
+    }
+    .nav-links a:hover, .nav-links a.active { background:var(--blue); color:white; }
+    .container { max-width:1200px; margin:0 auto; padding:24px; }
+    h1 { font-size:22px; color:var(--navy); margin-bottom:4px; }
+    p  { color:var(--gray); font-size:13px; margin-bottom:20px; }
+
+    table { width:100%; border-collapse:collapse; background:white;
+            border-radius:12px; overflow:hidden;
+            box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+    thead { background:var(--navy); }
+    thead th { color:white; padding:12px 16px; text-align:left; font-size:13px; }
+    tbody td { padding:12px 16px; font-size:13px; border-bottom:1px solid #F0F4F8; }
+    tbody tr:hover { background:var(--pale); }
+    tbody tr:last-child td { border-bottom:none; }
+
+    .badge {
+      display:inline-block; padding:3px 10px; border-radius:20px;
+      font-size:11px; font-weight:700;
+    }
+    .badge.high   { background:#FDECEA; color:var(--red); }
+    .badge.medium { background:#FEF5EC; color:var(--orange); }
+    .badge.low    { background:#EAFAF1; color:var(--green); }
+    .badge.resolved { background:#EAFAF1; color:var(--green); }
+    .badge.pending  { background:#FDECEA; color:var(--red); }
+
+    .snapshot-link { color:var(--blue); text-decoration:none; font-size:11px; }
+    .snapshot-link:hover { text-decoration:underline; }
+
+    .resolve-btn {
+      background:none; border:1px solid var(--green);
+      color:var(--green); font-size:11px; font-weight:600;
+      padding:4px 10px; border-radius:6px; cursor:pointer;
+    }
+    .resolve-btn:hover { background:var(--green); color:white; }
+    .footer { text-align:center; padding:24px; color:var(--gray); font-size:12px; }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <a class="navbar-brand" href="/">🛡️ SafeWatch AI</a>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/alerts" class="active">All Alerts</a>
+    <a href="/incidents">Incident Log</a>
+  </div>
+</nav>
+<div class="container">
+  <h1>All Alerts</h1>
+  <p>Complete history of all threat alerts triggered by SafeWatch AI</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Threat Type</th>
+        <th>Location</th>
+        <th>Camera</th>
+        <th>Score</th>
+        <th>Time</th>
+        <th>Evidence</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr id="row-{{ a.id }}">
+        <td>{{ a.id }}</td>
+        <td><strong>{{ a.threat_type }}</strong></td>
+        <td>{{ a.location }}</td>
+        <td>{{ a.camera_id }}</td>
+        <td>
+          {% set pct = (a.threat_score * 100)|int %}
+          <span class="badge {% if pct >= 70 %}high{% elif pct >= 40 %}medium{% else %}low{% endif %}">
+            {{ pct }}%
+          </span>
+        </td>
+        <td>{{ a.timestamp }}</td>
+        <td>
+          {% if a.snapshot_path %}
+            <a class="snapshot-link" href="/snapshots/{{ a.snapshot_path.split('/')[-1] }}" target="_blank">
+              📷 View
+            </a>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="badge {% if a.resolved %}resolved{% else %}pending{% endif %}">
+            {% if a.resolved %}✓ Resolved{% else %}⚠ Pending{% endif %}
+          </span>
+        </td>
+        <td>
+          {% if not a.resolved %}
+          <button class="resolve-btn" onclick="resolveAlert({{ a.id }})">✓ Resolve</button>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" style="text-align:center; padding:40px; color:#999">No alerts recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="footer">SafeWatch AI — AI-Based Women Safety Surveillance System — 2025–26</div>
+
+<script>
+async function resolveAlert(id) {
+  await fetch(`/api/alerts/${id}/resolve`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({operator:'Operator'})
+  });
+  document.getElementById(`row-${id}`).style.opacity = '0.4';
+  setTimeout(() => location.reload(), 600);
+}
+</script>
+</body>
+</html>

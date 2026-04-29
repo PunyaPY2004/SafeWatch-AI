@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}⚙️ Settings{% endblock %}
+
+{% block content %}
+<div class="settings-grid">
+  <!-- Alert Settings -->
+  <div class="card">
+    <div class="card-header"><h2>🔔 Alert Settings</h2></div>
+    <div class="card-body">
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">SMS Alerts (Twilio)</div>
+          <div class="setting-desc">Send SMS to control room on threat detection</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="sms-toggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Email Alerts</div>
+          <div class="setting-desc">Send email with snapshot attachment</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="email-toggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Elevator Warnings</div>
+          <div class="setting-desc">Trigger in-elevator buzzer/display</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="elev-toggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Twilio Config -->
+  <div class="card">
+    <div class="card-header"><h2>📱 Twilio SMS Config</h2></div>
+    <div class="card-body">
+      <label class="form-label">Account SID</label>
+      <input type="text" class="input-field full" id="twilio-sid" placeholder="ACxxxxxxxxxxxxxxxx">
+      <label class="form-label">Auth Token</label>
+      <input type="password" class="input-field full" id="twilio-token" placeholder="Your Twilio Auth Token">
+      <label class="form-label">From Number</label>
+      <input type="text" class="input-field full" id="twilio-from" placeholder="+1XXXXXXXXXX">
+      <label class="form-label">Alert Phone (Control Room)</label>
+      <input type="text" class="input-field full" id="alert-phone" placeholder="+91XXXXXXXXXX">
+      <p class="hint">Get free credentials at <a href="https://twilio.com" target="_blank">twilio.com</a></p>
+    </div>
+  </div>
+
+  <!-- Gmail Config -->
+  <div class="card">
+    <div class="card-header"><h2>📧 Email Config</h2></div>
+    <div class="card-body">
+      <label class="form-label">Gmail Address</label>
+      <input type="email" class="input-field full" id="gmail-user" placeholder="your@gmail.com">
+      <label class="form-label">App Password</label>
+      <input type="password" class="input-field full" id="gmail-pass" placeholder="Gmail App Password (not your real password)">
+      <label class="form-label">Alert Email (Control Room)</label>
+      <input type="email" class="input-field full" id="alert-email" placeholder="controlroom@police.gov.in">
+      <p class="hint">📌 Enable App Passwords in Google Account → Security → 2-Step Verification → App Passwords</p>
+    </div>
+  </div>
+
+  <!-- Threat Thresholds -->
+  <div class="card">
+    <div class="card-header"><h2>⚡ Detection Thresholds</h2></div>
+    <div class="card-body">
+      <label class="form-label">Suspicious Threshold: <strong id="susp-val">35</strong>%</label>
+      <input type="range" min="10" max="60" value="35" id="susp-thresh" class="slider"
+             oninput="document.getElementById('susp-val').textContent=this.value">
+      <label class="form-label">Threat Threshold: <strong id="threat-val">65</strong>%</label>
+      <input type="range" min="40" max="90" value="65" id="threat-thresh" class="slider"
+             oninput="document.getElementById('threat-val').textContent=this.value">
+      <label class="form-label">Alert Cooldown: <strong id="cool-val">10</strong> seconds</label>
+      <input type="range" min="5" max="60" value="10" id="cooldown" class="slider"
+             oninput="document.getElementById('cool-val').textContent=this.value">
+    </div>
+  </div>
+
+  <!-- Test + Save -->
+  <div class="card span-2">
+    <div class="card-body inline-form">
+      <button onclick="saveSettings()" class="btn btn-primary">💾 Save Settings</button>
+      <button onclick="testAlert()" class="btn btn-secondary">🧪 Send Test Alert</button>
+      <span id="save-msg" class="text-muted"></span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function saveSettings() {
+  const data = {
+    sms_enabled:    document.getElementById('sms-toggle').checked,
+    email_enabled:  document.getElementById('email-toggle').checked,
+    twilio_sid:     document.getElementById('twilio-sid').value,
+    twilio_token:   document.getElementById('twilio-token').value,
+    twilio_from:    document.getElementById('twilio-from').value,
+    alert_phone:    document.getElementById('alert-phone').value,
+    gmail_user:     document.getElementById('gmail-user').value,
+    gmail_password: document.getElementById('gmail-pass').value,
+    alert_email:    document.getElementById('alert-email').value,
+  };
+  fetch('/api/save_settings', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(() => {
+    const msg = document.getElementById('save-msg');
+    msg.textContent = '✅ Settings saved!';
+    msg.style.color = '#44ff88';
+    setTimeout(() => msg.textContent = '', 3000);
+  });
+}
+function testAlert() {
+  fetch('/api/test_alert', { method:'POST' })
+    .then(() => alert('✅ Test alert sent! Check the Live Feed page.'));
+}
+</script>
+{% endblock %}
